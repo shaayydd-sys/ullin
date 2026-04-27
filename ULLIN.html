@@ -1,0 +1,1276 @@
+﻿<!doctype html>
+<html lang="en" data-grain="on" data-fuzzy="on" data-cursor="blob">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ULLIN — Independent Design Studio</title>
+<link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600,700,800,900&display=swap" />
+<link rel="stylesheet" href="ullin.css" />
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" data-presets="react">
+
+// tweaks-panel.jsx
+// Reusable Tweaks shell + form-control helpers.
+//
+// Owns the host protocol (listens for __activate_edit_mode / __deactivate_edit_mode,
+// posts __edit_mode_available / __edit_mode_set_keys / __edit_mode_dismissed) so
+// individual prototypes don't re-roll it. Ships a consistent set of controls so you
+// don't hand-draw <input type="range">, segmented radios, steppers, etc.
+//
+// Usage (in an HTML file that loads React + Babel):
+//
+//   const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+//     "primaryColor": "#D97757",
+//     "fontSize": 16,
+//     "density": "regular",
+//     "dark": false
+//   }/*EDITMODE-END*/;
+//
+//   function App() {
+//     const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+//     return (
+//       <div style={{ fontSize: t.fontSize, color: t.primaryColor }}>
+//         Hello
+//         <TweaksPanel>
+//           <TweakSection label="Typography" />
+//           <TweakSlider label="Font size" value={t.fontSize} min={10} max={32} unit="px"
+//                        onChange={(v) => setTweak('fontSize', v)} />
+//           <TweakRadio  label="Density" value={t.density}
+//                        options={['compact', 'regular', 'comfy']}
+//                        onChange={(v) => setTweak('density', v)} />
+//           <TweakSection label="Theme" />
+//           <TweakColor  label="Primary" value={t.primaryColor}
+//                        onChange={(v) => setTweak('primaryColor', v)} />
+//           <TweakToggle label="Dark mode" value={t.dark}
+//                        onChange={(v) => setTweak('dark', v)} />
+//         </TweaksPanel>
+//       </div>
+//     );
+//   }
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+const __TWEAKS_STYLE = `
+  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
+    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    background:rgba(250,249,247,.78);color:#29261b;
+    -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
+    font:11.5px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
+  .twk-hd{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 8px 10px 14px;cursor:move;user-select:none}
+  .twk-hd b{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);
+    width:22px;height:22px;border-radius:6px;cursor:default;font-size:13px;line-height:1}
+  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
+  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;overflow-x:hidden;min-height:0;
+    scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  .twk-body::-webkit-scrollbar{width:8px}
+  .twk-body::-webkit-scrollbar-track{background:transparent;margin:2px}
+  .twk-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  .twk-body::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.25);
+    border:2px solid transparent;background-clip:content-box}
+  .twk-row{display:flex;flex-direction:column;gap:5px}
+  .twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;
+    color:rgba(41,38,27,.72)}
+  .twk-lbl>span:first-child{font-weight:500}
+  .twk-val{color:rgba(41,38,27,.5);font-variant-numeric:tabular-nums}
+
+  .twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:rgba(41,38,27,.45);padding:10px 0 0}
+  .twk-sect:first-child{padding-top:0}
+
+  .twk-field{appearance:none;width:100%;height:26px;padding:0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;
+    background:rgba(255,255,255,.6);color:inherit;font:inherit;outline:none}
+  .twk-field:focus{border-color:rgba(0,0,0,.25);background:rgba(255,255,255,.85)}
+  select.twk-field{padding-right:22px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(0,0,0,.5)' d='M0 0h10L5 6z'/></svg>");
+    background-repeat:no-repeat;background-position:right 8px center}
+
+  .twk-slider{appearance:none;-webkit-appearance:none;width:100%;height:4px;margin:6px 0;
+    border-radius:999px;background:rgba(0,0,0,.12);outline:none}
+  .twk-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:14px;height:14px;border-radius:50%;background:#fff;
+    border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+  .twk-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;
+    background:#fff;border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+
+  .twk-seg{position:relative;display:flex;padding:2px;border-radius:8px;
+    background:rgba(0,0,0,.06);user-select:none}
+  .twk-seg-thumb{position:absolute;top:2px;bottom:2px;border-radius:6px;
+    background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);
+    transition:left .15s cubic-bezier(.3,.7,.4,1),width .15s}
+  .twk-seg.dragging .twk-seg-thumb{transition:none}
+  .twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;
+    background:transparent;color:inherit;font:inherit;font-weight:500;min-height:22px;
+    border-radius:6px;cursor:default;padding:4px 6px;line-height:1.2;
+    overflow-wrap:anywhere}
+
+  .twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;
+    background:rgba(0,0,0,.15);transition:background .15s;cursor:default;padding:0}
+  .twk-toggle[data-on="1"]{background:#34c759}
+  .twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+  .twk-toggle[data-on="1"] i{transform:translateX(14px)}
+
+  .twk-num{display:flex;align-items:center;height:26px;padding:0 0 0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:rgba(255,255,255,.6)}
+  .twk-num-lbl{font-weight:500;color:rgba(41,38,27,.6);cursor:ew-resize;
+    user-select:none;padding-right:8px}
+  .twk-num input{flex:1;min-width:0;height:100%;border:0;background:transparent;
+    font:inherit;font-variant-numeric:tabular-nums;text-align:right;padding:0 8px 0 0;
+    outline:none;color:inherit;-moz-appearance:textfield}
+  .twk-num input::-webkit-inner-spin-button,.twk-num input::-webkit-outer-spin-button{
+    -webkit-appearance:none;margin:0}
+  .twk-num-unit{padding-right:8px;color:rgba(41,38,27,.45)}
+
+  .twk-btn{appearance:none;height:26px;padding:0 12px;border:0;border-radius:7px;
+    background:rgba(0,0,0,.78);color:#fff;font:inherit;font-weight:500;cursor:default}
+  .twk-btn:hover{background:rgba(0,0,0,.88)}
+  .twk-btn.secondary{background:rgba(0,0,0,.06);color:inherit}
+  .twk-btn.secondary:hover{background:rgba(0,0,0,.1)}
+
+  .twk-swatch{appearance:none;-webkit-appearance:none;width:56px;height:22px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:6px;padding:0;cursor:default;
+    background:transparent;flex-shrink:0}
+  .twk-swatch::-webkit-color-swatch-wrapper{padding:0}
+  .twk-swatch::-webkit-color-swatch{border:0;border-radius:5.5px}
+  .twk-swatch::-moz-color-swatch{border:0;border-radius:5.5px}
+`;
+
+// ── useTweaks ───────────────────────────────────────────────────────────────
+// Single source of truth for tweak values. setTweak persists via the host
+// (__edit_mode_set_keys → host rewrites the EDITMODE block on disk).
+function useTweaks(defaults) {
+  const [values, setValues] = React.useState(defaults);
+  // Accepts either setTweak('key', value) or setTweak({ key: value, ... }) so a
+  // useState-style call doesn't write a "[object Object]" key into the persisted
+  // JSON block.
+  const setTweak = React.useCallback((keyOrEdits, val) => {
+    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
+      ? keyOrEdits : { [keyOrEdits]: val };
+    setValues((prev) => ({ ...prev, ...edits }));
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
+  }, []);
+  return [values, setTweak];
+}
+
+// ── TweaksPanel ─────────────────────────────────────────────────────────────
+// Floating shell. Registers the protocol listener BEFORE announcing
+// availability — if the announce ran first, the host's activate could land
+// before our handler exists and the toolbar toggle would silently no-op.
+// The close button posts __edit_mode_dismissed so the host's toolbar toggle
+// flips off in lockstep; the host echoes __deactivate_edit_mode back which
+// is what actually hides the panel.
+function TweaksPanel({ title = 'Tweaks', children }) {
+  const [open, setOpen] = React.useState(false);
+  const dragRef = React.useRef(null);
+  const offsetRef = React.useRef({ x: 16, y: 16 });
+  const PAD = 16;
+
+  const clampToViewport = React.useCallback(() => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const w = panel.offsetWidth, h = panel.offsetHeight;
+    const maxRight = Math.max(PAD, window.innerWidth - w - PAD);
+    const maxBottom = Math.max(PAD, window.innerHeight - h - PAD);
+    offsetRef.current = {
+      x: Math.min(maxRight, Math.max(PAD, offsetRef.current.x)),
+      y: Math.min(maxBottom, Math.max(PAD, offsetRef.current.y)),
+    };
+    panel.style.right = offsetRef.current.x + 'px';
+    panel.style.bottom = offsetRef.current.y + 'px';
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    clampToViewport();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', clampToViewport);
+      return () => window.removeEventListener('resize', clampToViewport);
+    }
+    const ro = new ResizeObserver(clampToViewport);
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, [open, clampToViewport]);
+
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      const t = e?.data?.type;
+      if (t === '__activate_edit_mode') setOpen(true);
+      else if (t === '__deactivate_edit_mode') setOpen(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  const dismiss = () => {
+    setOpen(false);
+    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+  };
+
+  const onDragStart = (e) => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    const sx = e.clientX, sy = e.clientY;
+    const startRight = window.innerWidth - r.right;
+    const startBottom = window.innerHeight - r.bottom;
+    const move = (ev) => {
+      offsetRef.current = {
+        x: startRight - (ev.clientX - sx),
+        y: startBottom - (ev.clientY - sy),
+      };
+      clampToViewport();
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  if (!open) return null;
+  return (
+    <>
+      <style>{__TWEAKS_STYLE}</style>
+      <div ref={dragRef} className="twk-panel"
+           style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}>
+        <div className="twk-hd" onMouseDown={onDragStart}>
+          <b>{title}</b>
+          <button className="twk-x" aria-label="Close tweaks"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={dismiss}>✕</button>
+        </div>
+        <div className="twk-body">{children}</div>
+      </div>
+    </>
+  );
+}
+
+// ── Layout helpers ──────────────────────────────────────────────────────────
+
+function TweakSection({ label, children }) {
+  return (
+    <>
+      <div className="twk-sect">{label}</div>
+      {children}
+    </>
+  );
+}
+
+function TweakRow({ label, value, children, inline = false }) {
+  return (
+    <div className={inline ? 'twk-row twk-row-h' : 'twk-row'}>
+      <div className="twk-lbl">
+        <span>{label}</span>
+        {value != null && <span className="twk-val">{value}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Controls ────────────────────────────────────────────────────────────────
+
+function TweakSlider({ label, value, min = 0, max = 100, step = 1, unit = '', onChange }) {
+  return (
+    <TweakRow label={label} value={`${value}${unit}`}>
+      <input type="range" className="twk-slider" min={min} max={max} step={step}
+             value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </TweakRow>
+  );
+}
+
+function TweakToggle({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <button type="button" className="twk-toggle" data-on={value ? '1' : '0'}
+              role="switch" aria-checked={!!value}
+              onClick={() => onChange(!value)}><i /></button>
+    </div>
+  );
+}
+
+function TweakRadio({ label, value, options, onChange }) {
+  const trackRef = React.useRef(null);
+  const [dragging, setDragging] = React.useState(false);
+  const opts = options.map((o) => (typeof o === 'object' ? o : { value: o, label: o }));
+  const idx = Math.max(0, opts.findIndex((o) => o.value === value));
+  const n = opts.length;
+
+  // The active value is read by pointer-move handlers attached for the lifetime
+  // of a drag — ref it so a stale closure doesn't fire onChange for every move.
+  const valueRef = React.useRef(value);
+  valueRef.current = value;
+
+  const segAt = (clientX) => {
+    const r = trackRef.current.getBoundingClientRect();
+    const inner = r.width - 4;
+    const i = Math.floor(((clientX - r.left - 2) / inner) * n);
+    return opts[Math.max(0, Math.min(n - 1, i))].value;
+  };
+
+  const onPointerDown = (e) => {
+    setDragging(true);
+    const v0 = segAt(e.clientX);
+    if (v0 !== valueRef.current) onChange(v0);
+    const move = (ev) => {
+      if (!trackRef.current) return;
+      const v = segAt(ev.clientX);
+      if (v !== valueRef.current) onChange(v);
+    };
+    const up = () => {
+      setDragging(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  return (
+    <TweakRow label={label}>
+      <div ref={trackRef} role="radiogroup" onPointerDown={onPointerDown}
+           className={dragging ? 'twk-seg dragging' : 'twk-seg'}>
+        <div className="twk-seg-thumb"
+             style={{ left: `calc(2px + ${idx} * (100% - 4px) / ${n})`,
+                      width: `calc((100% - 4px) / ${n})` }} />
+        {opts.map((o) => (
+          <button key={o.value} type="button" role="radio" aria-checked={o.value === value}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakSelect({ label, value, options, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <select className="twk-field" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => {
+          const v = typeof o === 'object' ? o.value : o;
+          const l = typeof o === 'object' ? o.label : o;
+          return <option key={v} value={v}>{l}</option>;
+        })}
+      </select>
+    </TweakRow>
+  );
+}
+
+function TweakText({ label, value, placeholder, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <input className="twk-field" type="text" value={value} placeholder={placeholder}
+             onChange={(e) => onChange(e.target.value)} />
+    </TweakRow>
+  );
+}
+
+function TweakNumber({ label, value, min, max, step = 1, unit = '', onChange }) {
+  const clamp = (n) => {
+    if (min != null && n < min) return min;
+    if (max != null && n > max) return max;
+    return n;
+  };
+  const startRef = React.useRef({ x: 0, val: 0 });
+  const onScrubStart = (e) => {
+    e.preventDefault();
+    startRef.current = { x: e.clientX, val: value };
+    const decimals = (String(step).split('.')[1] || '').length;
+    const move = (ev) => {
+      const dx = ev.clientX - startRef.current.x;
+      const raw = startRef.current.val + dx * step;
+      const snapped = Math.round(raw / step) * step;
+      onChange(clamp(Number(snapped.toFixed(decimals))));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  return (
+    <div className="twk-num">
+      <span className="twk-num-lbl" onPointerDown={onScrubStart}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+             onChange={(e) => onChange(clamp(Number(e.target.value)))} />
+      {unit && <span className="twk-num-unit">{unit}</span>}
+    </div>
+  );
+}
+
+function TweakColor({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <input type="color" className="twk-swatch" value={value}
+             onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+function TweakButton({ label, onClick, secondary = false }) {
+  return (
+    <button type="button" className={secondary ? 'twk-btn secondary' : 'twk-btn'}
+            onClick={onClick}>{label}</button>
+  );
+}
+
+Object.assign(window, {
+  useTweaks, TweaksPanel, TweakSection, TweakRow,
+  TweakSlider, TweakToggle, TweakRadio, TweakSelect,
+  TweakText, TweakNumber, TweakColor, TweakButton,
+});
+
+</script>
+<script type="text/babel" data-presets="react">
+/* global React, ReactDOM */
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+// ---------- TWEAK DEFAULTS ----------
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "primary": "#BE3A3A",
+  "primaryAccent": "#E94141",
+  "ink": "#000000",
+  "panel": "#272727",
+  "paper": "#FFFFFF",
+  "headline": "Your Vision Our Craft",
+  "footerLine": "We Build Digital Worlds",
+  "showGrain": true,
+  "fuzzyHeadlines": true,
+  "cursorMode": "blob"
+}/*EDITMODE-END*/;
+
+// ---------- DATA ----------
+const NAV = ["Home", "Work", "Studio", "Contact"];
+
+const PROJECTS = [
+  {
+    id: "01",
+    name: "Helix Beverage Co.",
+    year: "2025",
+    discipline: "Brand · Packaging · Site",
+    summary: "A reformulated identity for an experimental kombucha label leaning into ferment, foam, and friction.",
+    tone: "warm",
+    swatch: "#BE3A3A"
+  },
+  {
+    id: "02",
+    name: "Notch Editorial",
+    year: "2025",
+    discipline: "Editorial · Type · Web",
+    summary: "A long-form magazine for independent technologists, set in a custom rough display cut.",
+    tone: "ink",
+    swatch: "#272727"
+  },
+  {
+    id: "03",
+    name: "Maro Studio",
+    year: "2024",
+    discipline: "Identity · Motion",
+    summary: "A logotype that breathes — drawn 38 times, animated frame by frame for a furniture maker.",
+    tone: "paper",
+    swatch: "#E94141"
+  },
+  {
+    id: "04",
+    name: "Forager Index",
+    year: "2024",
+    discipline: "Product · Strategy",
+    summary: "Inventory tooling for small-batch food makers. We rebuilt the order flow from scratch.",
+    tone: "warm",
+    swatch: "#BE3A3A"
+  },
+  {
+    id: "05",
+    name: "Northbeam",
+    year: "2023",
+    discipline: "Brand · Site",
+    summary: "Maritime navigation software, given a quieter, more confident voice — and a working colour system.",
+    tone: "ink",
+    swatch: "#272727"
+  },
+  {
+    id: "06",
+    name: "Solene & Co.",
+    year: "2023",
+    discipline: "Identity · Print",
+    summary: "A small architecture practice. We made the smallest possible mark and then printed it very large.",
+    tone: "paper",
+    swatch: "#E94141"
+  }
+];
+
+const SERVICES = [
+  { n: "01", name: "Brand Identity", body: "Logotypes, marks, naming, voice, and the bones underneath." },
+  { n: "02", name: "Digital Product", body: "Web, mobile, internal tools — designed and shipped end-to-end." },
+  { n: "03", name: "Editorial & Print", body: "Books, reports, packaging. Things that cost money to print, made well." },
+  { n: "04", name: "Motion", body: "Logos that move, transitions that earn their seconds, films that run short." }
+];
+
+// ---------- ASSETS ----------
+// Build a fuzzy-text SVG inline. Each filter id is unique per src so multiple
+// instances don't collide.
+function buildFuzzySVG(text, fontSize, lineHeight, filterId) {
+  const lines = text.split("\n");
+  const w = 2400;
+  const h = lines.length * lineHeight + 80;
+  const ts = lines.map((line, i) => {
+    const y = (i + 1) * lineHeight - 12;
+    return `<text x="50%" y="${y}" text-anchor="middle" font-family="'Neue Haas Grotesk Display Pro','Switzer','Helvetica Neue',Helvetica,Arial,sans-serif" font-weight="900" font-size="${fontSize}" letter-spacing="-0.025em" fill="currentColor">${line}</text>`;
+  }).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" width="100%" height="100%">
+    <defs>
+      <filter id="${filterId}" x="-5%" y="-5%" width="110%" height="110%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="noise"/>
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="6"/>
+      </filter>
+    </defs>
+    <g filter="url(#${filterId})">${ts}</g>
+  </svg>`;
+}
+
+const FUZZY_PRESETS = {
+  "ullin": { text: "ullin", fontSize: 720, lineHeight: 720 },
+  "your-vision": { text: "Your Vision\nOur Craft", fontSize: 360, lineHeight: 380 },
+  "we-build": { text: "We Build\nDigital Worlds", fontSize: 320, lineHeight: 340 },
+};
+
+function FuzzySVG({ src, alt, ...rest }) {
+  // src is a key like "ullin", "your-vision", "we-build" (legacy paths also accepted)
+  const key = String(src).replace(/^.*\//, "").replace(/\.svg$/, "").replace(/-logo$/, "");
+  const preset = FUZZY_PRESETS[key] || FUZZY_PRESETS["ullin"];
+  const filterId = `fuzz-${key}`;
+  const markup = buildFuzzySVG(preset.text, preset.fontSize, preset.lineHeight, filterId);
+  return <div role="img" aria-label={alt} dangerouslySetInnerHTML={{ __html: markup }} {...rest} />;
+}
+
+// ---------- PRIMITIVES ----------
+function NavBar({ section, onSection }) {
+  return (
+    <header className="nav">
+      <button className="nav-mark" onClick={() => onSection("home")} aria-label="ULLIN home">
+        <img src="ullin-logo.svg" alt="ULLIN" />
+      </button>
+      <nav className="nav-list" aria-label="Primary">
+        {NAV.map((label) => {
+          const id = label.toLowerCase();
+          const active = section === id || (id === "home" && section === "home");
+          return (
+            <button
+              key={label}
+              className={`nav-link ${active ? "is-active" : ""}`}
+              onClick={() => onSection(id)}
+            >
+              <span className="nav-link-inner">{label}</span>
+              <span className="nav-link-rule" aria-hidden="true" />
+            </button>
+          );
+        })}
+      </nav>
+    </header>
+  );
+}
+
+function FuzzyHeadline({ src, alt, color }) {
+  return (
+    <div className="fuzzy" style={{ color }}>
+      <FuzzySVG src={src} alt={alt} className="fuzzy-svg" />
+    </div>
+  );
+}
+
+function UllinWordmark() {
+  return (
+    <div className="fuzzy">
+      <img src="ullin-logo.svg" alt="ULLIN" style={{ width: "100%", display: "block", filter: "brightness(0) invert(1)" }} />
+    </div>
+  );
+}
+
+function Marquee({ children, speed = 60, reverse = false }) {
+  const items = [];
+  for (let i = 0; i < 4; i++) items.push(<span className="marquee-item" key={i}>{children}</span>);
+  return (
+    <div className="marquee" data-reverse={reverse} style={{ "--marquee-speed": `${speed}s` }}>
+      <div className="marquee-track">{items}</div>
+    </div>
+  );
+}
+
+// ---------- HERO ----------
+function Hero({ onSection }) {
+  const [time, setTime] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const hh = String(time.getUTCHours()).padStart(2, "0");
+  const mm = String(time.getUTCMinutes()).padStart(2, "0");
+  const ss = String(time.getUTCSeconds()).padStart(2, "0");
+  return (
+    <section className="hero" data-screen-label="01 Hero">
+      <div className="hero-meta">
+        <div className="hero-meta-block">
+          <span className="meta-label">Studio</span>
+          <span className="meta-value">Lisbon</span>
+        </div>
+        <div className="hero-meta-block">
+          <span className="meta-label">UTC</span>
+          <span className="meta-value tabular">{hh}:{mm}:{ss}</span>
+        </div>
+        <div className="hero-meta-block">
+          <span className="meta-label">Index</span>
+          <span className="meta-value">No. 047 / Spring '26</span>
+        </div>
+      </div>
+      <div className="hero-stage">
+        <UllinWordmark />
+      </div>
+      <div className="hero-foot">
+        <p className="hero-tag">
+          An independent design practice — building brands, products and printed
+          things since 2018. Currently booking work for autumn.
+        </p>
+        <button className="hero-cta" onClick={() => onSection("contact")}>
+          <span className="hero-cta-text">Start a project</span>
+          <span className="hero-cta-arrow" aria-hidden="true">→</span>
+        </button>
+      </div>
+      <button className="hero-scroll" onClick={() => onSection("work")}>
+        <span>Scroll · selected work</span>
+        <span className="hero-scroll-line" aria-hidden="true" />
+      </button>
+    </section>
+  );
+}
+
+// ---------- WORK ----------
+function ProjectTile({ project, onOpen, hovered, onHover }) {
+  const tone = project.tone;
+  return (
+    <button
+      className="tile"
+      data-tone={tone}
+      onMouseEnter={() => onHover(project.id)}
+      onMouseLeave={() => onHover(null)}
+      onClick={() => onOpen(project)}
+      style={{ "--tile-swatch": project.swatch }}
+    >
+      <div className="tile-frame">
+        <div className="tile-art" aria-hidden="true">
+          <ProjectArt project={project} />
+        </div>
+        <div className="tile-overlay">
+          <span className="tile-id">{project.id}</span>
+          <span className="tile-open">
+            <span>View case</span>
+            <span aria-hidden="true">↗</span>
+          </span>
+        </div>
+      </div>
+      <div className="tile-meta">
+        <div className="tile-name">
+          <span className="tile-name-text">{project.name}</span>
+          <span className="tile-name-year">— {project.year}</span>
+        </div>
+        <div className="tile-disc">{project.discipline}</div>
+      </div>
+    </button>
+  );
+}
+
+// Each tile gets a different abstract composition so the grid feels like a real portfolio
+function ProjectArt({ project }) {
+  switch (project.id) {
+    case "01":
+      return (
+        <div className="art art-01">
+          <div className="art-01-bottle" />
+          <div className="art-01-label">HELIX <span>·</span> 06</div>
+          <div className="art-01-rule" />
+        </div>
+      );
+    case "02":
+      return (
+        <div className="art art-02">
+          <div className="art-02-mast">NOTCH</div>
+          <div className="art-02-issue">Issue 14 / Independent technologists</div>
+          <div className="art-02-cols">
+            <span /><span /><span /><span /><span /><span />
+          </div>
+        </div>
+      );
+    case "03":
+      return (
+        <div className="art art-03">
+          <div className="art-03-mark">M</div>
+          <div className="art-03-tag">Maro · 2024 —</div>
+        </div>
+      );
+    case "04":
+      return (
+        <div className="art art-04">
+          <div className="art-04-row"><span>SKU</span><span>Item</span><span>Q</span></div>
+          <div className="art-04-row"><span>0341</span><span>Pickled fennel</span><span>24</span></div>
+          <div className="art-04-row"><span>0342</span><span>Black garlic</span><span>06</span></div>
+          <div className="art-04-row"><span>0343</span><span>Rye levain</span><span>12</span></div>
+          <div className="art-04-row art-04-row-active"><span>0344</span><span>Sour cherry shrub</span><span>02</span></div>
+          <div className="art-04-row"><span>0345</span><span>Verjus</span><span>18</span></div>
+        </div>
+      );
+    case "05":
+      return (
+        <div className="art art-05">
+          <svg viewBox="0 0 200 200" preserveAspectRatio="none">
+            <circle cx="100" cy="100" r="80" fill="none" stroke="currentColor" strokeWidth="0.6" />
+            <circle cx="100" cy="100" r="60" fill="none" stroke="currentColor" strokeWidth="0.6" />
+            <circle cx="100" cy="100" r="40" fill="none" stroke="currentColor" strokeWidth="0.6" />
+            <line x1="100" y1="20" x2="100" y2="180" stroke="currentColor" strokeWidth="0.4" />
+            <line x1="20" y1="100" x2="180" y2="100" stroke="currentColor" strokeWidth="0.4" />
+            <path d="M 100 100 L 142 65" stroke="currentColor" strokeWidth="1.2" />
+            <circle cx="100" cy="100" r="3" fill="currentColor" />
+          </svg>
+          <div className="art-05-tag">Northbeam · 047°N</div>
+        </div>
+      );
+    case "06":
+      return (
+        <div className="art art-06">
+          <div className="art-06-dot" />
+          <div className="art-06-name">Solene</div>
+          <div className="art-06-amp">&amp;</div>
+          <div className="art-06-name">Co.</div>
+        </div>
+      );
+    default:
+      return null;
+  }
+}
+
+function Work({ onOpen }) {
+  const [hovered, setHovered] = useState(null);
+  const [filter, setFilter] = useState("All");
+  const filters = ["All", "Brand", "Product", "Editorial"];
+  const filtered = useMemo(() => {
+    if (filter === "All") return PROJECTS;
+    return PROJECTS.filter(p => p.discipline.toLowerCase().includes(filter.toLowerCase()));
+  }, [filter]);
+
+  return (
+    <section className="work" data-screen-label="02 Work">
+      <div className="work-headline">
+        <div className="fuzzy">
+          <img src="your-vision.svg" alt="Your Vision Our Craft" style={{ width: "100%", display: "block", filter: "brightness(0)" }} />
+        </div>
+      </div>
+
+      <div className="work-controls">
+        <div className="work-filters">
+          {filters.map(f => (
+            <button
+              key={f}
+              className={`chip ${filter === f ? "is-active" : ""}`}
+              onClick={() => setFilter(f)}
+            >
+              <span>{f}</span>
+              <span className="chip-count">
+                {f === "All" ? PROJECTS.length : PROJECTS.filter(p => p.discipline.toLowerCase().includes(f.toLowerCase())).length}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="work-status">
+          {hovered ? `Hovering — ${PROJECTS.find(p => p.id === hovered)?.name}` : "Select a project to view the case study"}
+        </div>
+      </div>
+
+      <div className="work-grid">
+        {filtered.map((p) => (
+          <ProjectTile key={p.id} project={p} onOpen={onOpen} hovered={hovered} onHover={setHovered} />
+        ))}
+      </div>
+
+      <div className="work-foot">
+        <div className="work-foot-label">A selection. The full archive is available on request.</div>
+        <button className="link-arrow">
+          <span>view all</span>
+          <span className="link-arrow-rule" aria-hidden="true" />
+        </button>
+      </div>
+    </section>
+  );
+}
+
+// ---------- STUDIO ----------
+function Studio() {
+  return (
+    <section className="studio" data-screen-label="03 Studio">
+      <div className="studio-headline">
+        <span className="studio-eyebrow">Studio · A practice, not an agency</span>
+        <h2 className="studio-h">
+          We are six people who care about the things they make.
+          We work in long arcs, with a small number of clients each year.
+        </h2>
+      </div>
+      <div className="studio-grid">
+        <div className="studio-col">
+          <span className="meta-label">Approach</span>
+          <p>
+            Every project starts with reading. We spend the first week with documents,
+            archives, and the people who will live with the work after we hand it over.
+            We do not begin design until we can describe the project in one paragraph.
+          </p>
+        </div>
+        <div className="studio-col">
+          <span className="meta-label">What we do</span>
+          <ul className="services">
+            {SERVICES.map(s => (
+              <li key={s.n} className="service">
+                <span className="service-n">{s.n}</span>
+                <div className="service-body">
+                  <span className="service-name">{s.name}</span>
+                  <span className="service-desc">{s.body}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="studio-col">
+          <span className="meta-label">Index</span>
+          <dl className="kpi">
+            <div><dt>Founded</dt><dd>2018</dd></div>
+            <div><dt>Cases shipped</dt><dd>62</dd></div>
+            <div><dt>Awards</dt><dd>Quietly proud</dd></div>
+            <div><dt>Clients per year</dt><dd>≤ 8</dd></div>
+          </dl>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------- CONTACT ----------
+function Contact() {
+  const [stage, setStage] = useState("form"); // form | sending | sent
+  const [form, setForm] = useState({ name: "", email: "", budget: "", scope: [], note: "" });
+  const SCOPES = ["Brand", "Product", "Editorial", "Motion", "Other"];
+
+  const toggleScope = (s) => {
+    setForm(f => ({
+      ...f,
+      scope: f.scope.includes(s) ? f.scope.filter(x => x !== s) : [...f.scope, s]
+    }));
+  };
+
+  const submit = (e) => {
+    e.preventDefault();
+    setStage("sending");
+    setTimeout(() => setStage("sent"), 1400);
+  };
+
+  return (
+    <section className="contact" data-screen-label="04 Contact">
+      <div className="contact-headline">
+        <div className="fuzzy">
+          <img src="we-build.svg" alt="We Build Digital Worlds" style={{ width: "100%", display: "block", filter: "brightness(0) invert(1)" }} />
+        </div>
+      </div>
+
+      <div className="contact-body">
+        <div className="contact-side">
+          <div className="contact-block">
+            <span className="meta-label inverse">Write to us</span>
+            <a className="contact-link" href="mailto:hello@ullin.studio">hello@ullin.studio</a>
+          </div>
+          <div className="contact-block">
+            <span className="meta-label inverse">Currently</span>
+            <p>Booking projects for autumn '26.</p>
+          </div>
+        </div>
+
+        <div className="contact-form-wrap">
+          {stage !== "sent" ? (
+            <form className="contact-form" onSubmit={submit}>
+              <label className="field">
+                <span className="field-label">01 — Your name</span>
+                <input
+                  className="field-input"
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="Type here…"
+                  required
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">02 — Email</span>
+                <input
+                  type="email"
+                  className="field-input"
+                  value={form.email}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder="you@studio.com"
+                  required
+                />
+              </label>
+              <div className="field">
+                <span className="field-label">03 — Scope</span>
+                <div className="chip-row">
+                  {SCOPES.map(s => (
+                    <button
+                      type="button"
+                      key={s}
+                      className={`chip chip-inverse ${form.scope.includes(s) ? "is-active" : ""}`}
+                      onClick={() => toggleScope(s)}
+                    >
+                      <span>{s}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="field">
+                <span className="field-label">04 — Budget range</span>
+                <div className="chip-row">
+                  {["< 25k", "25 – 60k", "60 – 120k", "120k +"].map(b => (
+                    <button
+                      type="button"
+                      key={b}
+                      className={`chip chip-inverse ${form.budget === b ? "is-active" : ""}`}
+                      onClick={() => setForm(f => ({ ...f, budget: b }))}
+                    >
+                      <span>{b}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <label className="field">
+                <span className="field-label">05 — A few sentences</span>
+                <textarea
+                  className="field-input field-textarea"
+                  value={form.note}
+                  onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
+                  placeholder="What are you trying to make?"
+                  rows={4}
+                />
+              </label>
+              <button className="submit" type="submit" disabled={stage === "sending"}>
+                <span>{stage === "sending" ? "Sending…" : "Send enquiry"}</span>
+                <span className="submit-arrow" aria-hidden="true">→</span>
+              </button>
+            </form>
+          ) : (
+            <div className="contact-sent">
+              <div className="contact-sent-mark">✓</div>
+              <h3>Thank you, {form.name || "friend"}.</h3>
+              <p>
+                We've received your note. Expect a reply from a real person within
+                two working days — usually faster.
+              </p>
+              <button className="link-arrow inverse" onClick={() => { setStage("form"); setForm({ name: "", email: "", budget: "", scope: [], note: "" }); }}>
+                <span>send another</span>
+                <span className="link-arrow-rule" aria-hidden="true" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="contact-foot">
+        <span>© ULLIN Studio 2018 — 2026</span>
+        <span>Independent · Lisbon</span>
+        <span>Site v3.2</span>
+      </div>
+    </section>
+  );
+}
+
+// ---------- PROJECT MODAL ----------
+function ProjectModal({ project, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+  if (!project) return null;
+  return (
+    <div className="modal" role="dialog" aria-modal="true">
+      <div className="modal-backdrop" onClick={onClose} />
+      <div className="modal-card" data-tone={project.tone} style={{ "--tile-swatch": project.swatch }}>
+        <button className="modal-close" onClick={onClose} aria-label="Close">
+          <span>Close</span>
+          <span aria-hidden="true">×</span>
+        </button>
+        <div className="modal-head">
+          <span className="modal-id">Case · {project.id}</span>
+          <h3 className="modal-title">{project.name}</h3>
+          <div className="modal-meta">
+            <span>{project.discipline}</span>
+            <span>·</span>
+            <span>{project.year}</span>
+          </div>
+        </div>
+        <div className="modal-art" aria-hidden="true">
+          <ProjectArt project={project} />
+        </div>
+        <div className="modal-body">
+          <div className="modal-col">
+            <span className="meta-label">The brief</span>
+            <p>{project.summary}</p>
+          </div>
+          <div className="modal-col">
+            <span className="meta-label">Engagement</span>
+            <ul className="bare-list">
+              <li>Discovery (2 weeks)</li>
+              <li>Concept (4 weeks)</li>
+              <li>Design system (6 weeks)</li>
+              <li>Build & handover (8 weeks)</li>
+            </ul>
+          </div>
+          <div className="modal-col">
+            <span className="meta-label">Outcome</span>
+            <p>
+              A reissued identity, a new digital home, and a printed
+              field guide that staff still use. We continue to work
+              with the team on quarterly increments.
+            </p>
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="link-arrow"><span>read the full case</span><span className="link-arrow-rule" aria-hidden="true" /></button>
+          <button className="link-arrow" onClick={onClose}><span>back to work</span><span className="link-arrow-rule" aria-hidden="true" /></button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- TWEAKS ----------
+function TweaksUI() {
+  const { TweaksPanel, useTweaks, TweakSection, TweakColor, TweakToggle, TweakSelect } = window;
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  // apply CSS vars
+  useEffect(() => {
+    const r = document.documentElement.style;
+    r.setProperty("--primary", tweaks.primary);
+    r.setProperty("--primary-accent", tweaks.primaryAccent);
+    r.setProperty("--ink", tweaks.ink);
+    r.setProperty("--panel", tweaks.panel);
+    r.setProperty("--paper", tweaks.paper);
+    document.documentElement.dataset.grain = tweaks.showGrain ? "on" : "off";
+    document.documentElement.dataset.fuzzy = tweaks.fuzzyHeadlines ? "on" : "off";
+    document.documentElement.dataset.cursor = tweaks.cursorMode;
+  }, [tweaks]);
+
+  return (
+    <TweaksPanel title="Tweaks">
+      <TweakSection title="Palette">
+        <TweakColor label="Primary" value={tweaks.primary} onChange={(v) => setTweak("primary", v)} />
+        <TweakColor label="Primary accent" value={tweaks.primaryAccent} onChange={(v) => setTweak("primaryAccent", v)} />
+        <TweakColor label="Ink" value={tweaks.ink} onChange={(v) => setTweak("ink", v)} />
+        <TweakColor label="Panel (tiles)" value={tweaks.panel} onChange={(v) => setTweak("panel", v)} />
+      </TweakSection>
+      <TweakSection title="Treatment">
+        <TweakToggle label="Fuzzy headlines" value={tweaks.fuzzyHeadlines} onChange={(v) => setTweak("fuzzyHeadlines", v)} />
+        <TweakToggle label="Paper grain" value={tweaks.showGrain} onChange={(v) => setTweak("showGrain", v)} />
+        <TweakSelect
+          label="Cursor"
+          value={tweaks.cursorMode}
+          onChange={(v) => setTweak("cursorMode", v)}
+          options={[
+            { value: "blob", label: "Soft blob" },
+            { value: "crosshair", label: "Crosshair" },
+            { value: "off", label: "System" }
+          ]}
+        />
+      </TweakSection>
+    </TweaksPanel>
+  );
+}
+
+// ---------- CUSTOM CURSOR ----------
+function Cursor() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.visibility = "hidden";
+
+    const onMove = (e) => {
+      el.style.visibility = "visible";
+      el.style.transform = `translate(${e.clientX}px,${e.clientY}px)`;
+      const below = document.elementFromPoint(e.clientX, e.clientY);
+      const next = below?.closest("button,a,.tile") ? "1" : "0";
+      if (el.dataset.over !== next) el.dataset.over = next;
+    };
+
+    window.addEventListener("mousemove", onMove, { passive: true });
+    return () => window.removeEventListener("mousemove", onMove);
+  }, []);
+  return (
+    <div ref={ref} className="cursor" aria-hidden="true">
+      <div className="cursor-inner" />
+    </div>
+  );
+}
+
+// ---------- APP ----------
+function App() {
+  const [section, setSection] = useState("home");
+  const [openProject, setOpenProject] = useState(null);
+  const sections = useRef({});
+  const [observed, setObserved] = useState("home");
+
+  const goto = useCallback((id) => {
+    setSection(id);
+    const el = sections.current[id];
+    if (el) el.scrollIntoView ? el.scrollIntoView({ behavior: "smooth", block: "start" }) : window.scrollTo(0, el.offsetTop);
+  }, []);
+
+  // Observe sections to update active nav based on scroll
+  useEffect(() => {
+    const obs = new IntersectionObserver((entries) => {
+      const v = entries.filter(e => e.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (v) {
+        const id = v.target.dataset.section;
+        if (id) { setObserved(id); setSection(id); }
+      }
+    }, { threshold: [0.3, 0.6] });
+    Object.values(sections.current).forEach(el => el && obs.observe(el));
+    return () => obs.disconnect();
+  }, []);
+
+  const theme = section === "home" ? "red" : section === "contact" ? "red" : section === "studio" ? "ink" : "paper";
+
+  return (
+    <>
+      <Cursor />
+      <NavBar section={section} onSection={goto} />
+
+      <main>
+        <div ref={(el) => (sections.current.home = el)} data-section="home">
+          <Hero onSection={goto} />
+        </div>
+        <div ref={(el) => (sections.current.work = el)} data-section="work">
+          <Work onOpen={setOpenProject} />
+        </div>
+        <div ref={(el) => (sections.current.studio = el)} data-section="studio">
+          <Studio />
+        </div>
+        <div ref={(el) => (sections.current.contact = el)} data-section="contact">
+          <Contact />
+        </div>
+      </main>
+
+      <Marquee speed={40}>
+        <span>ULLIN STUDIO</span>
+        <span className="marquee-dot">●</span>
+        <span>Independent design practice</span>
+        <span className="marquee-dot">●</span>
+        <span>Lisbon</span>
+        <span className="marquee-dot">●</span>
+        <span>Booking autumn '26</span>
+        <span className="marquee-dot">●</span>
+      </Marquee>
+
+      {openProject && <ProjectModal project={openProject} onClose={() => setOpenProject(null)} />}
+
+      <TweaksUI />
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
+</script>
+
+<script src="https://unpkg.com/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://unpkg.com/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+<script>
+(function () {
+  function init() {
+    gsap.registerPlugin(ScrollTrigger);
+    const E = "power3.out";
+
+    // ── Hero: entrance on load ──────────────────────────────
+    gsap.timeline({ defaults: { ease: E } })
+      .from(".hero-stage",      { y: 60, opacity: 0, duration: 1.3 })
+      .from(".hero-meta-block", { y: 22, opacity: 0, duration: 0.8, stagger: 0.1 }, "-=0.75")
+      .from(".hero-foot",       { y: 28, opacity: 0, duration: 0.8 }, "-=0.55")
+      .from(".hero-scroll",     { opacity: 0, duration: 0.6 }, "-=0.3");
+
+    // ── Scroll reveal helper ────────────────────────────────
+    function reveal(sel, { y = 50, dur = 0.85, stagger = 0, start = "top 87%" } = {}) {
+      const els = document.querySelectorAll(sel);
+      if (!els.length) return;
+      gsap.from(els, {
+        y, opacity: 0, duration: dur, ease: E, stagger,
+        scrollTrigger: { trigger: els[0], start, once: true },
+      });
+    }
+
+    // ── Work ────────────────────────────────────────────────
+    reveal(".work-headline .fuzzy",  { y: 90, dur: 1.15 });
+    reveal(".work-controls",         { y: 30, dur: 0.7, start: "top 90%" });
+
+    document.querySelectorAll(".tile").forEach((el) => {
+      gsap.from(el, {
+        y: 80, opacity: 0, duration: 0.95, ease: E,
+        scrollTrigger: { trigger: el, start: "top 90%", once: true },
+      });
+    });
+
+    // ── Studio ──────────────────────────────────────────────
+    reveal(".studio-eyebrow",  { y: 24, dur: 0.75 });
+    reveal(".studio-h",        { y: 40, dur: 1.0, start: "top 88%" });
+    reveal(".studio-col",      { y: 55, dur: 0.9, stagger: 0.14, start: "top 85%" });
+
+    // ── Contact ─────────────────────────────────────────────
+    reveal(".contact-headline .fuzzy", { y: 90, dur: 1.15 });
+    reveal(".contact-block",           { y: 35, dur: 0.8, stagger: 0.12 });
+    reveal(".contact-form-wrap",       { y: 55, dur: 0.9, start: "top 88%" });
+  }
+
+  // Wait for React to mount, then run
+  function waitForMount() {
+    const root = document.getElementById("root");
+    if (root && root.children.length > 0) {
+      setTimeout(init, 120);
+    } else {
+      requestAnimationFrame(waitForMount);
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", waitForMount);
+  } else {
+    waitForMount();
+  }
+})();
+</script>
+</body>
+</html>

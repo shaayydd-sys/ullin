@@ -1,0 +1,12 @@
+{
+  "name": "ullin",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite --open /ULLIN.html",
+    "preview": "vite preview --open /ULLIN.html"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}
