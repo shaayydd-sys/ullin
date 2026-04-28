@@ -13,6 +13,24 @@
   --tile-swatch: var(--primary);
 }
 
+/* ---------- INTRO ---------- */
+#intro {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8vw;
+  will-change: transform;
+}
+#intro-logo {
+  width: min(560px, 72vw);
+  filter: brightness(0);
+  display: block;
+}
+
 * { box-sizing: border-box; }
 
 html, body {
