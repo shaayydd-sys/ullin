@@ -830,9 +830,12 @@ function Studio() {
   return (
     <section className="studio" data-screen-label="03 Studio">
       <div className="studio-headline">
+        <div className="studio-who">
+          <img src="who.svg" alt="Who" style={{ width: "100%", display: "block", filter: "brightness(0) invert(1)" }} />
+        </div>
         <span className="studio-eyebrow">Studio · A practice, not an agency</span>
         <h2 className="studio-h">
-          We are six people who care about the things they make.
+          We are people who care about the things they make.
           We work in long arcs, with a small number of clients each year.
         </h2>
       </div>
@@ -864,8 +867,6 @@ function Studio() {
           <dl className="kpi">
             <div><dt>Founded</dt><dd>2018</dd></div>
             <div><dt>Cases shipped</dt><dd>62</dd></div>
-            <div><dt>Awards</dt><dd>Quietly proud</dd></div>
-            <div><dt>Clients per year</dt><dd>≤ 8</dd></div>
           </dl>
         </div>
       </div>
@@ -1272,6 +1273,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
       });
     });
 
+    reveal(".studio-who",               { y: 70, dur: 1.1 });
     reveal(".studio-eyebrow",           { y: 24, dur: 0.75 });
     reveal(".studio-h",                 { y: 40, dur: 1.0,  start: "top 88%" });
     reveal(".studio-col",               { y: 55, dur: 0.9,  stagger: 0.14, start: "top 85%" });

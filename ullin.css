@@ -716,6 +716,12 @@ html[data-grain="on"] .work::after { opacity: 1; }
   max-width: 1100px;
   margin-bottom: 80px;
 }
+.studio-who {
+  max-width: 900px;
+  margin-bottom: 32px;
+  animation: hero-breathe 6s ease-in-out infinite;
+}
+
 .studio-eyebrow {
   font-family: var(--font-mono); font-weight: 300;
   font-size: 11px;
